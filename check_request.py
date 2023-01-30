@@ -9,25 +9,17 @@ from loguru import logger
 from telegram import ParseMode
 
 
-def retry_request(func):
-    def wrapper(*args, **kwargs):
-        reconnect_time = 0.1
-        while True:
-            try:
-                return func(*args, **kwargs)
-            except requests.exceptions.ConnectionError:
-                time.sleep(reconnect_time)
-                reconnect_time *= 2
-                logger.warning(f'Потеря соединения. Повторный запрос через {reconnect_time} секунд')
-
-    return wrapper
-
-
-@retry_request
 def get_response(url: str, headers: dict = None, params: dict = None, timeout: int = None) -> requests.Response:
-    response: requests.Response = requests.get(url, headers=headers, params=params, timeout=timeout)
-    response.raise_for_status()
-    return response
+    reconnect_time = 0.1
+    while True:
+        try:
+            response = requests.get(url, headers=headers, params=params, timeout=timeout)
+            response.raise_for_status()
+            return response
+        except requests.exceptions.ConnectionError:
+            time.sleep(reconnect_time)
+            reconnect_time *= 2
+            logger.warning(f'Потеря соединения. Повторный запрос через {reconnect_time} секунд')
 
 
 def send_telegram_message(response_json: dict, chat_id: int, bot: telegram.Bot) -> None:
@@ -49,27 +41,24 @@ def get_new_checks(devman_api_token: str, bot: telegram.Bot, chat_id: int, timeo
     timestamp = datetime.now().timestamp()
     logger.debug(f'TIMESTAMP_NOW: {timestamp}')
 
-    headers = {
-        'Authorization': f'Token {devman_api_token}',
-    }
-    params = {
-        'timestamp': timestamp,
-    }
+    headers = {'Authorization': f'Token {devman_api_token}'}
+    params = {'timestamp': timestamp}
+
     while True:
         url = f'https://dvmn.org/api/long_polling/'
-        logger.debug(url)
         logger.info(f'Запустили LONG POLLING. Таймаут {timeout} секунд')
         try:
+            # Делаем запрос к API
             response = get_response(url, headers=headers, params=params, timeout=timeout)
             response_json = response.json()
+            logger.debug(response_json)
+            # Если запрос верный - отправляем сообщение в Телеграм
             if response_json.get('status') == 'found':
                 send_telegram_message(response_json, chat_id, bot)
 
             timestamp = response_json.get('timestamp_to_request') or response_json.get('last_attempt_timestamp')
-            params = {
-                'timestamp': timestamp,
-            }
-            logger.info(response.json())
+            params = {'timestamp': timestamp}
+            logger.info(response_json)
 
         except requests.exceptions.ReadTimeout as error:
             logger.warning(f'Таймаут запроса отработал раньше чем сервер ответил: {error}')
