@@ -63,9 +63,8 @@ def get_new_checks(devman_api_token: str, bot: telegram.Bot, chat_id: int, timeo
         except requests.exceptions.ReadTimeout as error:
             logger.warning(f'Таймаут запроса отработал раньше чем сервер ответил: {error}')
             timestamp = datetime.now().timestamp()
-            params = {
-                'timestamp': timestamp,
-            }
+            params = {'timestamp': timestamp}
+
             continue
 
 
