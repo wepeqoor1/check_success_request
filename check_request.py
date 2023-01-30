@@ -30,20 +30,22 @@ def get_response(url: str, headers: dict = None, timeout: int = None) -> request
     return response
 
 
-def create_telegram_message(response_json: dict) -> str:
+def send_telegram_message(response_json: dict, chat_id: int, bot: telegram.Bot) -> None:
     new_attempts = response_json['new_attempts'][0]
-    is_negative = 'Работа возвращена' if new_attempts['is_negative'] is True else 'Работа проверена'
-    answer = dedent(f"""
+    is_negative = 'Работа не выполнена' if new_attempts['is_negative'] is True else 'Работа сдана'
+
+    telegram_message = dedent(f"""
     <b>{new_attempts['lesson_title']}</b>
 
     {is_negative}
     {new_attempts['lesson_url']}
     """)
 
-    return answer
+    bot.send_message(chat_id=chat_id, text=telegram_message, parse_mode=ParseMode.HTML)
+    logger.debug('Сообщение отправлено в чат Телеграмма')
 
 
-def get_list_of_checks(devman_api_token: str, bot: telegram.Bot, chat_id: int, timeout: int = 300) -> None:
+def get_new_request_task(devman_api_token: str, bot: telegram.Bot, chat_id: int, timeout: int = 300) -> None:
     timestamp = datetime.now().timestamp()
     logger.debug(f'TIMESTAMP_NOW: {timestamp}')
 
@@ -58,9 +60,7 @@ def get_list_of_checks(devman_api_token: str, bot: telegram.Bot, chat_id: int, t
             response = get_response(url, headers=headers, timeout=timeout)
             response_json = response.json()
             if response_json.get('status') == 'found':
-                telegram_message = create_telegram_message(response_json)
-                bot.send_message(chat_id=chat_id, text=telegram_message, parse_mode=ParseMode.HTML)
-                logger.debug('Сообщение отправлено в чат Телеграмма')
+                send_telegram_message(response_json, chat_id, bot)
 
             timestamp = response_json.get('timestamp_to_request') or response_json.get('last_attempt_timestamp')
             logger.info(response.json())
@@ -84,7 +84,7 @@ def main():
     logger_level = 'DEBUG' if env('DEBUG_MODE', False) else 'INFO'
     logger.add('logging.log', format='{time} {level} {message}', level=logger_level)
 
-    get_list_of_checks(devman_api_token, bot, telegram_chat_id)
+    get_new_request_task(devman_api_token, bot, telegram_chat_id)
 
 
 if __name__ == '__main__':
