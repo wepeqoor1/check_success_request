@@ -50,15 +50,15 @@ def get_new_checks(devman_api_token: str, bot: telegram.Bot, chat_id: int, timeo
         try:
             # Делаем запрос к API
             response = get_response(url, headers=headers, params=params, timeout=timeout)
-            response_json = response.json()
-            logger.debug(response_json)
+            response_api = response.json()
+            logger.debug(response_api)
             # Если запрос верный - отправляем сообщение в Телеграм
-            if response_json.get('status') == 'found':
-                send_telegram_message(response_json, chat_id, bot)
+            if response_api.get('status') == 'found':
+                send_telegram_message(response_api, chat_id, bot)
 
-            timestamp = response_json.get('timestamp_to_request') or response_json.get('last_attempt_timestamp')
+            timestamp = response_api.get('timestamp_to_request') or response_api.get('last_attempt_timestamp')
             params = {'timestamp': timestamp}
-            logger.info(response_json)
+            logger.info(response_api)
 
         except requests.exceptions.ReadTimeout as error:
             logger.warning(f'Таймаут запроса отработал раньше чем сервер ответил: {error}')
