@@ -24,8 +24,8 @@ def retry_request(func):
 
 
 @retry_request
-def get_response(url: str, headers: dict = None, timeout: int = None) -> requests.Response:
-    response: requests.Response = requests.get(url, headers=headers, timeout=timeout)
+def get_response(url: str, headers: dict = None, params: dict = None, timeout: int = None) -> requests.Response:
+    response: requests.Response = requests.get(url, headers=headers, params=params, timeout=timeout)
     response.raise_for_status()
     return response
 
@@ -45,29 +45,38 @@ def send_telegram_message(response_json: dict, chat_id: int, bot: telegram.Bot) 
     logger.debug('Сообщение отправлено в чат Телеграмма')
 
 
-def get_new_request_task(devman_api_token: str, bot: telegram.Bot, chat_id: int, timeout: int = 300) -> None:
+def get_new_checks(devman_api_token: str, bot: telegram.Bot, chat_id: int, timeout: int = 300) -> None:
     timestamp = datetime.now().timestamp()
     logger.debug(f'TIMESTAMP_NOW: {timestamp}')
 
     headers = {
         'Authorization': f'Token {devman_api_token}',
     }
+    params = {
+        'timestamp': timestamp,
+    }
     while True:
-        url = f'https://dvmn.org/api/long_polling/?timestamp={timestamp}'
+        url = f'https://dvmn.org/api/long_polling/'
         logger.debug(url)
         logger.info(f'Запустили LONG POLLING. Таймаут {timeout} секунд')
         try:
-            response = get_response(url, headers=headers, timeout=timeout)
+            response = get_response(url, headers=headers, params=params, timeout=timeout)
             response_json = response.json()
             if response_json.get('status') == 'found':
                 send_telegram_message(response_json, chat_id, bot)
 
             timestamp = response_json.get('timestamp_to_request') or response_json.get('last_attempt_timestamp')
+            params = {
+                'timestamp': timestamp,
+            }
             logger.info(response.json())
 
         except requests.exceptions.ReadTimeout as error:
             logger.warning(f'Таймаут запроса отработал раньше чем сервер ответил: {error}')
             timestamp = datetime.now().timestamp()
+            params = {
+                'timestamp': timestamp,
+            }
             continue
 
 
@@ -84,7 +93,7 @@ def main():
     logger_level = 'DEBUG' if env('DEBUG_MODE', False) else 'INFO'
     logger.add('logging.log', format='{time} {level} {message}', level=logger_level)
 
-    get_new_request_task(devman_api_token, bot, telegram_chat_id)
+    get_new_checks(devman_api_token, bot, telegram_chat_id)
 
 
 if __name__ == '__main__':
