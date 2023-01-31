@@ -28,7 +28,7 @@ pip install -r requirements.txt
 python check_request.py
 ```
 
-## Запуск в Docker
+## Запуск в Docker-compose
 - Необходимо установить последнюю версию [Docker](https://www.docker.com)
 - Запустите Docker container в директории, где находится файл [docker-compose](docker-compose.yml):
 ```bash 
