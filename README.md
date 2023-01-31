@@ -27,3 +27,14 @@ pip install -r requirements.txt
 ```bash
 python check_request.py
 ```
+
+## Запуск в Docker
+- Необходимо установить последнюю версию [Docker](https://www.docker.com)
+- Соберите Docker image:
+```bash 
+docker build -t check-dvmn-tasks .
+```
+- Заупстите контейнер:
+```bash 
+docker run -d -p 8000:8000 --name <docker-container-name> --env-file <path/to/env/file/.env> <image/name>
+```
