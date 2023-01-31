@@ -1,4 +1,4 @@
-# check_success_request
+# CHECK SUCCESS REQUEST
 Проверка статуса работ на devman.org
 
 ## Описание
