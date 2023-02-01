@@ -9,13 +9,17 @@ from environs import Env
 from loguru import logger
 from telegram import ParseMode
 
+import emojy
+
 
 def send_telegram_message(response_json: dict, chat_id: int, bot: telegram.Bot) -> None:
     new_attempts = response_json['new_attempts'][0]
-    is_negative = 'Работа не выполнена' if new_attempts['is_negative'] is True else 'Работа сдана'
+    is_negative = f'{emojy.false}Работа не выполнена{emojy.false}' \
+        if new_attempts['is_negative'] is True \
+        else f'{emojy.true}Работа сдана{emojy.true}'
 
     telegram_message = dedent(f"""
-    <b>{new_attempts['lesson_title']}</b>
+    {emojy.ufo}<b>{new_attempts['lesson_title']}</b>{emojy.ufo}
 
     {is_negative}
     {new_attempts['lesson_url']}
