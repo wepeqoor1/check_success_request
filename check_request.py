@@ -44,7 +44,6 @@ def get_new_checks(devman_api_token: str, bot: telegram.Bot, chat_id: int, timeo
 
     while True:
         url = f'https://dvmn.org/api/long_polling/'
-        logger.info(f'Запустили LONG POLLING. Таймаут {timeout} секунд')
         try:
             # Делаем запрос к API
             response = requests.get(url, headers=headers, params=params, timeout=timeout)
@@ -59,10 +58,9 @@ def get_new_checks(devman_api_token: str, bot: telegram.Bot, chat_id: int, timeo
             timestamp = checked_tasks.get('timestamp_to_request') or checked_tasks.get('last_attempt_timestamp')
             params = {'timestamp': timestamp}
             reconnect_time = 0.1
-            logger.info(checked_tasks)
 
         except requests.exceptions.ReadTimeout as error:
-            logger.warning(f'Таймаут запроса отработал раньше чем сервер ответил: {error}')
+            logger.warning(f'Таймаут запроса отработал раньше чем сервер ответил: {error}. Делаем повторный запрос.')
             timestamp = datetime.now().timestamp()
             params = {'timestamp': timestamp}
             continue
@@ -71,6 +69,13 @@ def get_new_checks(devman_api_token: str, bot: telegram.Bot, chat_id: int, timeo
             time.sleep(reconnect_time)
             reconnect_time *= 2
             logger.warning(f'Потеря соединения. Повторный запрос через {reconnect_time} секунд')
+            continue
+
+        except requests.exceptions.HTTPError as http_error:
+            time.sleep(reconnect_time)
+            reconnect_time *= 2
+            logger.warning(f'Запрос вернул ответ {http_error.response}. Повторное подключение через {reconnect_time}')
+            continue
 
 
 def main():
