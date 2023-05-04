@@ -1,7 +1,6 @@
 import sys
 import time
 from datetime import datetime
-from enum import Enum
 from textwrap import dedent
 
 import requests
@@ -30,12 +29,25 @@ def send_telegram_message(response_json: dict, chat_id: int, bot: telegram.Bot) 
     """)
 
     bot.send_message(chat_id=chat_id, text=telegram_message, parse_mode=ParseMode.HTML)
-    logger.debug('Сообщение отправлено в чат Телеграмма')
+    logger.debug(f'Сообщение {telegram_message} отправлено в чат Телеграмма')
+
+
+def start_telegram_bot_message(chat_id: int, bot: telegram.Bot) -> None:
+    telegram_message = 'Бот запущен'
+    bot.send_message(chat_id=chat_id, text=telegram_message)
+
+
+def error_telegram_bot_message(bot_error_message: Exception, chat_id: int, bot: telegram.Bot) -> None:
+    telegram_message = dedent(
+        f"""
+        Бот упал с ошибкой:
+        {bot_error_message}""",
+    )
+    bot.send_message(chat_id=chat_id, text=telegram_message)
 
 
 def get_new_checks(devman_api_token: str, bot: telegram.Bot, chat_id: int, timeout: int = 300) -> None:
     timestamp = datetime.now().timestamp()
-    logger.debug(f'TIMESTAMP_NOW: {timestamp}')
 
     headers = {'Authorization': f'Token {devman_api_token}'}
     params = {'timestamp': timestamp}
@@ -82,16 +94,20 @@ def main():
     env = Env()
     env.read_env()
 
-    devman_api_token = env('DEVMAN_TOKEN_API')
-    telegram_api_key = env('TELEGRAM_API_KEY')
-    telegram_chat_id = env('TELEGRAM_CHAT_ID')
+    devman_api_token = env.str('DEVMAN_TOKEN_API')
+    telegram_api_key = env.str('TELEGRAM_API_KEY')
+    telegram_chat_id = env.int('TELEGRAM_CHAT_ID')
 
     bot = telegram.Bot(token=telegram_api_key)
 
-    logger_level = 'DEBUG' if env('DEBUG_MODE', False) else 'INFO'
+    logger_level = 'DEBUG' if env.bool('DEBUG_MODE') else 'INFO'
     logger.add(sys.stdout, format='{time} {level} {message}', level=logger_level)
 
-    get_new_checks(devman_api_token, bot, telegram_chat_id)
+    start_telegram_bot_message(telegram_chat_id, bot)
+    try:
+        get_new_checks(devman_api_token, bot, telegram_chat_id)
+    except Exception as exception:
+        error_telegram_bot_message(exception, telegram_chat_id, bot)
 
 
 if __name__ == '__main__':
