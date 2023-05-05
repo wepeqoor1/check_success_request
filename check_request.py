@@ -100,8 +100,9 @@ def main():
 
     bot = telegram.Bot(token=telegram_api_key)
 
-    logger_level = 'DEBUG' if env.bool('DEBUG_MODE') else 'INFO'
-    logger.add(sys.stdout, format='{time} {level} {message}', level=logger_level)
+    logger_level = 'DEBUG' if env.bool('DEBUG_MODE', False) else 'INFO'
+    logger.level(logger_level)
+    logger.add(sys.stdout, format='{time} {level} {message}')
 
     start_telegram_bot_message(telegram_chat_id, bot)
     try:
