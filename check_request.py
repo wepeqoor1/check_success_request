@@ -10,7 +10,12 @@ from loguru import logger
 from telegram import ParseMode
 
 
-def send_telegram_message(response_json: dict, chat_id: int, bot: telegram.Bot) -> None:
+def send_telegram_message(chat_id: int, bot: telegram.Bot, telegram_message: str) -> None:
+    bot.send_message(chat_id=chat_id, text=telegram_message, parse_mode=ParseMode.HTML)
+    logger.debug(f'Сообщение {telegram_message} отправлено в чат Телеграмма')
+
+
+def generate_telegram_message(response_json: dict) -> str:
     emojy = {
         'ufo': '&#128126',
         'true': '&#9989',
@@ -22,28 +27,13 @@ def send_telegram_message(response_json: dict, chat_id: int, bot: telegram.Bot) 
         else f'{emojy["true"]}Работа сдана{emojy["true"]}'
 
     telegram_message = dedent(f"""
-    {emojy["ufo"]}<b>{new_attempts['lesson_title']}</b>{emojy["ufo"]}
+        {emojy["ufo"]}<b>{new_attempts['lesson_title']}</b>{emojy["ufo"]}
 
-    {is_negative}
-    {new_attempts['lesson_url']}
-    """)
+        {is_negative}
+        {new_attempts['lesson_url']}
+        """)
 
-    bot.send_message(chat_id=chat_id, text=telegram_message, parse_mode=ParseMode.HTML)
-    logger.debug(f'Сообщение {telegram_message} отправлено в чат Телеграмма')
-
-
-def start_telegram_bot_message(chat_id: int, bot: telegram.Bot) -> None:
-    telegram_message = 'Бот запущен'
-    bot.send_message(chat_id=chat_id, text=telegram_message)
-
-
-def error_telegram_bot_message(bot_error_message: Exception, chat_id: int, bot: telegram.Bot) -> None:
-    telegram_message = dedent(
-        f"""
-        Бот упал с ошибкой:
-        {bot_error_message}""",
-    )
-    bot.send_message(chat_id=chat_id, text=telegram_message)
+    return telegram_message
 
 
 def get_new_checks(devman_api_token: str, bot: telegram.Bot, chat_id: int, timeout: int = 300) -> None:
@@ -57,15 +47,15 @@ def get_new_checks(devman_api_token: str, bot: telegram.Bot, chat_id: int, timeo
     while True:
         url = f'https://dvmn.org/api/long_polling/'
         try:
-            # Делаем запрос к API
             response = requests.get(url, headers=headers, params=params, timeout=timeout)
             response.raise_for_status()
 
             checked_tasks = response.json()
             logger.debug(checked_tasks)
-            # Если запрос верный - отправляем сообщение в Телеграм
+
             if checked_tasks.get('status') == 'found':
-                send_telegram_message(checked_tasks, chat_id, bot)
+                telegram_message = generate_telegram_message(checked_tasks)
+                send_telegram_message(chat_id, bot, telegram_message)
 
             timestamp = checked_tasks.get('timestamp_to_request') or checked_tasks.get('last_attempt_timestamp')
             params = {'timestamp': timestamp}
@@ -73,7 +63,6 @@ def get_new_checks(devman_api_token: str, bot: telegram.Bot, chat_id: int, timeo
 
         except requests.exceptions.ReadTimeout as error:
             logger.warning(f'Таймаут запроса отработал раньше чем сервер ответил: {error}. Делаем повторный запрос.')
-            timestamp = datetime.now().timestamp()
             params = {'timestamp': timestamp}
             continue
 
@@ -104,11 +93,17 @@ def main():
     logger.level(logger_level)
     logger.add(sys.stdout, format='{time} {level} {message}')
 
-    start_telegram_bot_message(telegram_chat_id, bot)
-    try:
-        get_new_checks(devman_api_token, bot, telegram_chat_id)
-    except Exception as exception:
-        error_telegram_bot_message(exception, telegram_chat_id, bot)
+    send_telegram_message(telegram_chat_id, bot, telegram_message='Бот запущен')
+    while True:
+        try:
+            get_new_checks(devman_api_token, bot, telegram_chat_id)
+        except Exception as exception:
+            telegram_message = dedent(
+                f"""
+                Бот упал с ошибкой:
+                {exception}""",
+            )
+            send_telegram_message(telegram_chat_id, bot, telegram_message)
 
 
 if __name__ == '__main__':
